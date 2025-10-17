@@ -47,7 +47,7 @@ knowledgebase-search/
 ## ⚙️ Installation
 
 ### 1. Clone the repository
-git clone https://github.com/karthikrajesh10/knowledge-based-engine.git
+git clone https://github.com/Saarang05/knowledge-base-engine.git 
 cd knowledgebase-search
 
 ### 2. Create and activate a virtual environment
@@ -126,4 +126,4 @@ https://youtu.be/fIKqJ_S-IlM
 
 ## 👤 Author
 
-Karthik R S
+Saarang P
