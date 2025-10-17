@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Knowledge-base Search</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; color: #222; }
+      .container { max-width: 800px; margin: 0 auto; }
+      h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+      textarea { width: 100%; min-height: 100px; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px; }
+      button { background: #2563eb; color: white; border: none; padding: 0.6rem 1rem; border-radius: 8px; cursor: pointer; }
+      button:disabled { opacity: 0.6; cursor: not-allowed; }
+      .row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
+      input[type="number"] { width: 5rem; padding: 0.4rem; border: 1px solid #ddd; border-radius: 6px; }
+      .answer { margin-top: 1rem; padding: 1rem; background: #fafafa; border: 1px solid #eee; border-radius: 8px; white-space: pre-wrap; }
+      .sources { margin-top: 0.75rem; font-size: 0.9rem; color: #444; }
+      .source-item { padding: 0.35rem 0; border-bottom: 1px dashed #eee; }
+      .upload { margin-top: 2rem; padding: 1rem; border: 1px solid #eee; border-radius: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Knowledge-base Search</h1>
+      <p>Ask a question based on your ingested documents.</p>
+      <textarea id="query" placeholder="Type your question..."></textarea>
+      <div class="row">
+        <label for="topk">Top-K:</label>
+        <input id="topk" type="number" min="1" max="10" value="3" />
+        <button id="ask">Ask</button>
+      </div>
+      <div id="result" class="answer" style="display:none"></div>
+      <div id="sources" class="sources" style="display:none"></div>
+
+      <div class="upload">
+        <h2>Ingest Documents</h2>
+        <input id="files" type="file" multiple accept="application/pdf" />
+        <button id="ingest">Upload & Index</button>
+        <div id="ingestStatus" style="margin-top:0.5rem;color:#555"></div>
+      </div>
+    </div>
+
+    <script>
+      const apiBase = location.origin;
+
+      async function postJSON(path, body) {
+        const res = await fetch(`${apiBase}${path}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || res.statusText);
+        }
+        return res.json();
+      }
+
+      async function postFiles(path, files) {
+        const form = new FormData();
+        for (const f of files) form.append('files', f);
+        const res = await fetch(`${apiBase}${path}`, { method: 'POST', body: form });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || res.statusText);
+        }
+        return res.json();
+      }
+
+      document.getElementById('ask').addEventListener('click', async () => {
+        const btn = document.getElementById('ask');
+        const query = document.getElementById('query').value.trim();
+        const topk = parseInt(document.getElementById('topk').value, 10) || 3;
+        if (!query) return;
+        btn.disabled = true;
+        const resultEl = document.getElementById('result');
+        const sourcesEl = document.getElementById('sources');
+        resultEl.style.display = 'block';
+        resultEl.textContent = 'Thinking...';
+        sourcesEl.style.display = 'none';
+        sourcesEl.innerHTML = '';
+        try {
+          const data = await postJSON('/query', { query, top_k: topk });
+          resultEl.textContent = data.answer || '(no answer)';
+          if (Array.isArray(data.sources) && data.sources.length) {
+            sourcesEl.style.display = 'block';
+            sourcesEl.innerHTML = '<strong>Sources</strong>' + data.sources.map((s, i) =>
+              `<div class="source-item">#${i+1} [${s.doc_id || 'unknown'}] score=${s.score?.toFixed(4) || '-'}<br/>${s.text.substring(0, 200)}...</div>`
+            ).join('');
+          }
+        } catch (e) {
+          resultEl.textContent = `Error: ${e.message}`;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      document.getElementById('ingest').addEventListener('click', async () => {
+        const btn = document.getElementById('ingest');
+        const files = document.getElementById('files').files;
+        const statusEl = document.getElementById('ingestStatus');
+        if (!files || files.length === 0) return;
+        btn.disabled = true;
+        statusEl.textContent = 'Uploading...';
+        try {
+          const data = await postFiles('/ingest', files);
+          statusEl.textContent = `Indexed ${data.total_chunks} chunks from ${data.documents.length} file(s).`;
+        } catch (e) {
+          statusEl.textContent = `Error: ${e.message}`;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+  </html>
+
+
